@@ -1,14 +1,12 @@
-// Crimson Energy Initiative - Full Version with Backend API
+// Crimson Energy Initiative - Complete localStorage Version (No Backend Required)
+// I'm creating this as a complete working file for you
+// Simple Router and App State
 const app = {
     currentPage: 'home',
     navCollapse: null,
-    token: localStorage.getItem('token'),
-    user: JSON.parse(localStorage.getItem('user') || 'null'),
-    apiUrl: 'http://localhost:3000/api',
     
     init() {
       this.setupNavigation();
-      this.updateNavigation();
       this.renderPage('home');
       
       // Initialize collapse instance once (reuse across calls)
@@ -38,80 +36,7 @@ const app = {
             this.navCollapse.hide();
           }
         }
-        this.updateNavigation();
       });
-    },
-    
-    updateNavigation() {
-      const authLinks = document.getElementById('authLinks');
-      const profileLink = document.getElementById('profileLink');
-      
-      if (this.token && this.user) {
-        authLinks.innerHTML = '<button class="btn btn-outline-light btn-sm ms-2" id="logoutBtn">Logout</button>';
-        profileLink.style.display = 'block';
-        setTimeout(() => {
-          document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
-        }, 100);
-      } else {
-        authLinks.innerHTML = '<a class="nav-link" href="#" data-page="login">Login</a>';
-        profileLink.style.display = 'none';
-      }
-    },
-    
-    async apiCall(endpoint, options = {}) {
-      const headers = { 'Content-Type': 'application/json', ...options.headers };
-      if (this.token) {
-        headers.Authorization = `Bearer ${this.token}`;
-      }
-      const response = await fetch(`${this.apiUrl}${endpoint}`, { ...options, headers });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'API request failed');
-      return data;
-    },
-    
-    async login(email, password) {
-      try {
-        const data = await this.apiCall('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password })
-        });
-        this.token = data.token;
-        this.user = data.user;
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        this.updateNavigation();
-        this.renderPage('home');
-        return { success: true, message: data.message };
-      } catch (error) {
-        return { success: false, message: error.message };
-      }
-    },
-    
-    async register(email, password) {
-      try {
-        const data = await this.apiCall('/auth/register', {
-          method: 'POST',
-          body: JSON.stringify({ email, password })
-        });
-        this.token = data.token;
-        this.user = data.user;
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        this.updateNavigation();
-        this.renderPage('home');
-        return { success: true, message: data.message };
-      } catch (error) {
-        return { success: false, message: error.message };
-      }
-    },
-    
-    logout() {
-      this.token = null;
-      this.user = null;
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      this.updateNavigation();
-      this.renderPage('home');
     },
   
     renderPage(page) {
@@ -129,22 +54,6 @@ const app = {
         case 'breakeven':
           appContainer.innerHTML = this.renderBreakevenPage();
           this.initBreakeven();
-          break;
-        case 'login':
-          appContainer.innerHTML = this.renderLoginPage();
-          this.initLogin();
-          break;
-        case 'register':
-          appContainer.innerHTML = this.renderRegisterPage();
-          this.initRegister();
-          break;
-        case 'profile':
-          appContainer.innerHTML = this.renderProfilePage();
-          this.initProfile();
-          break;
-        case 'chat':
-          appContainer.innerHTML = this.renderChatPage();
-          this.initChat();
           break;
         default:
           appContainer.innerHTML = this.renderHomePage();
@@ -516,16 +425,6 @@ const app = {
       // Show results
       document.getElementById('carbonResults').style.display = 'block';
       document.getElementById('carbonResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      
-      // Save calculation if user is logged in
-      if (this.token) {
-        this.saveCalculation(totalEmissions, null, {
-          electricity: electricityEmissions.toFixed(2),
-          gas: gasEmissions.toFixed(2),
-          vehicle: vehicleEmissions.toFixed(2),
-          flights: flightEmissions.toFixed(2)
-        }, null);
-      }
     },
   
     // ============ BREAKEVEN CALCULATOR PAGE ============
@@ -861,234 +760,10 @@ const app = {
       // Show results
       document.getElementById('breakevenResults').style.display = 'block';
       document.getElementById('breakevenResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      
-      // Save calculation if user is logged in
-      if (this.token) {
-        this.saveCalculation(null, breakevenYears, null, {
-          systemSize,
-          totalCost: netSystemCost,
-          annualSavings: firstYearSavings,
-          production: annualProduction,
-          percentCovered
-        });
-      }
     },
-    
-    async saveCalculation(carbonEmissions, breakevenYears, carbonDetails, breakevenDetails) {
-      if (!this.token) return;
-      try {
-        await this.apiCall('/user/save-calculation', {
-          method: 'POST',
-          body: JSON.stringify({ carbonEmissions, breakevenYears, carbonDetails, breakevenDetails })
-        });
-      } catch (error) {
-        console.error('Failed to save:', error);
-      }
-    },
-    
-    // ============ LOGIN PAGE ============
-    renderLoginPage() {
-      return `
-        <div class="container my-5">
-          <div class="row">
-            <div class="col-md-6 mx-auto">
-              <div class="card shadow-sm">
-                <div class="card-body p-5">
-                  <h2 class="text-center mb-4"><i class="bi bi-box-arrow-in-right text-success"></i> Login</h2>
-                  <form id="loginForm">
-                    <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="loginEmail" required></div>
-                    <div class="mb-3"><label class="form-label">Password</label><input type="password" class="form-control" id="loginPassword" required></div>
-                    <div class="d-grid mb-3"><button type="submit" class="btn btn-success btn-lg">Login</button></div>
-                    <div class="alert alert-danger" id="loginError" style="display: none;"></div>
-                  </form>
-                  <hr><p class="text-center mb-0">Don't have an account? <a href="#" data-page="register">Register here</a></p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    },
-    
-    initLogin() {
-      document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const errorDiv = document.getElementById('loginError');
-        errorDiv.style.display = 'none';
-        const result = await this.login(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value);
-        if (!result.success) {
-          errorDiv.textContent = result.message;
-          errorDiv.style.display = 'block';
-        }
-      });
-    },
-    
-    // ============ REGISTER PAGE ============
-    renderRegisterPage() {
-      return `
-        <div class="container my-5">
-          <div class="row">
-            <div class="col-md-6 mx-auto">
-              <div class="card shadow-sm">
-                <div class="card-body p-5">
-                  <h2 class="text-center mb-4"><i class="bi bi-person-plus text-success"></i> Register</h2>
-                  <form id="registerForm">
-                    <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="registerEmail" required></div>
-                    <div class="mb-3"><label class="form-label">Password</label><input type="password" class="form-control" id="registerPassword" required minlength="6"><small class="text-muted">Minimum 6 characters</small></div>
-                    <div class="mb-3"><label class="form-label">Confirm Password</label><input type="password" class="form-control" id="registerPasswordConfirm" required></div>
-                    <div class="d-grid mb-3"><button type="submit" class="btn btn-success btn-lg">Register</button></div>
-                    <div class="alert alert-danger" id="registerError" style="display: none;"></div>
-                  </form>
-                  <hr><p class="text-center mb-0">Already have an account? <a href="#" data-page="login">Login here</a></p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    },
-    
-    initRegister() {
-      document.getElementById('registerForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const password = document.getElementById('registerPassword').value;
-        const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
-        const errorDiv = document.getElementById('registerError');
-        errorDiv.style.display = 'none';
-        if (password !== passwordConfirm) {
-          errorDiv.textContent = 'Passwords do not match';
-          errorDiv.style.display = 'block';
-          return;
-        }
-        const result = await this.register(document.getElementById('registerEmail').value, password);
-        if (!result.success) {
-          errorDiv.textContent = result.message;
-          errorDiv.style.display = 'block';
-        }
-      });
-    },
-    
-    // ============ PROFILE PAGE ============
-    renderProfilePage() {
-      if (!this.token || !this.user) {
-        return `<div class="container my-5"><div class="alert alert-warning text-center"><h4>Please login to view your profile</h4><a href="#" data-page="login" class="btn btn-success">Login</a></div></div>`;
-      }
-      return `
-        <div class="container my-5">
-          <div class="row">
-            <div class="col-lg-10 mx-auto">
-              <h2 class="text-center mb-4"><i class="bi bi-person-circle text-success"></i> My Profile</h2>
-              <div class="card shadow-sm mb-4"><div class="card-body"><h5 class="card-title">Account Information</h5><p><strong>Email:</strong> ${this.user.email}</p><p><strong>Member since:</strong> <span id="memberSince">Loading...</span></p></div></div>
-              <div class="card shadow-sm" id="profileData"><div class="card-body"><h5 class="card-title">Latest Calculations</h5><div id="profileContent" class="text-center py-4"><div class="spinner-border text-success" role="status"><span class="visually-hidden">Loading...</span></div></div></div></div>
-            </div>
-          </div>
-        </div>
-      `;
-    },
-    
-    async initProfile() {
-      if (!this.token || !this.user) return;
-      try {
-        const data = await this.apiCall('/user/profile');
-        if (data.user.createdAt) {
-          document.getElementById('memberSince').textContent = new Date(data.user.createdAt).toLocaleDateString();
-        }
-        const contentDiv = document.getElementById('profileContent');
-        if (data.latestCarbon || data.latestBreakeven) {
-          contentDiv.innerHTML = `
-            <div class="row g-4">
-              ${data.latestCarbon ? `<div class="col-md-6"><div class="card bg-light"><div class="card-body text-center"><h6 class="text-muted">Carbon Emissions</h6><h2 class="text-success">${data.latestCarbon.carbonEmissions.toFixed(2)} tons CO₂</h2><small class="text-muted">Calculated: ${new Date(data.latestCarbon.createdAt).toLocaleDateString()}</small></div></div></div>` : '<div class="col-md-6"></div>'}
-              ${data.latestBreakeven ? `<div class="col-md-6"><div class="card bg-light"><div class="card-body text-center"><h6 class="text-muted">Breakeven Point</h6><h2 class="text-warning">${data.latestBreakeven.breakevenYears.toFixed(1)} years</h2><small class="text-muted">Calculated: ${new Date(data.latestBreakeven.createdAt).toLocaleDateString()}</small></div></div></div>` : '<div class="col-md-6"></div>'}
-            </div>
-            <div class="alert alert-info mt-4"><p class="mb-0"><i class="bi bi-info-circle"></i> These are your latest saved calculations.</p></div>
-          `;
-        } else {
-          contentDiv.innerHTML = `<div class="alert alert-light"><h6>No calculations yet</h6><p class="mb-2">Start by using our calculators.</p><a href="#" data-page="calculator" class="btn btn-success btn-sm">Carbon Calculator</a> <a href="#" data-page="breakeven" class="btn btn-success btn-sm">Breakeven Analysis</a></div>`;
-        }
-      } catch (error) {
-        document.getElementById('profileContent').innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-      }
-    },
-    
-    // ============ CHAT PAGE ============
-    renderChatPage() {
-      return `
-        <div class="container my-5">
-          <div class="row">
-            <div class="col-lg-8 mx-auto">
-              <h1 class="display-5 fw-bold text-center mb-4">
-                <i class="bi bi-chat-dots text-success"></i> Solar Energy AI Assistant
-              </h1>
-              <p class="lead text-center text-muted mb-4">
-                Ask me anything about solar energy, clean energy options, or renewable energy!
-              </p>
-              
-              <div class="card shadow-sm">
-                <div class="card-body" style="height: 500px; display: flex; flex-direction: column;">
-                  <div id="chatMessages" class="flex-grow-1 overflow-auto mb-3 p-3 bg-light rounded" style="max-height: 400px;">
-                    <div class="alert alert-info">
-                      <strong>AI Assistant:</strong> Hi! I'm here to help you learn about solar energy and clean energy options. What would you like to know?
-                    </div>
-                  </div>
-                  
-                  <form id="chatForm">
-                    <div class="input-group">
-                      <input type="text" class="form-control" id="chatInput" placeholder="Ask your question..." required>
-                      <button type="submit" class="btn btn-success" id="sendBtn">
-                        <i class="bi bi-send"></i> Send
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    },
-    
-    initChat() {
-      const form = document.getElementById('chatForm');
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const input = document.getElementById('chatInput');
-        const message = input.value.trim();
-        if (!message) return;
-        
-        input.value = '';
-        const sendBtn = document.getElementById('sendBtn');
-        const originalText = sendBtn.innerHTML;
-        sendBtn.disabled = true;
-        sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
-        
-        // Add user message
-        const messagesDiv = document.getElementById('chatMessages');
-        messagesDiv.innerHTML += `<div class="mb-2 text-end"><div class="badge bg-primary p-2">${message}</div></div>`;
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        
-        try {
-          const response = await fetch(`${this.apiUrl}/chat/message`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
-          });
-          
-          const data = await response.json();
-          
-          if (response.ok) {
-            messagesDiv.innerHTML += `<div class="mb-2"><div class="alert alert-success mb-0"><strong>AI:</strong> ${data.response}</div></div>`;
-          } else {
-            messagesDiv.innerHTML += `<div class="mb-2"><div class="alert alert-danger mb-0">Error: ${data.error}</div></div>`;
-          }
-          messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        } catch (error) {
-          messagesDiv.innerHTML += `<div class="mb-2"><div class="alert alert-danger mb-0">Error: ${error.message}</div></div>`;
-        }
-        
-        sendBtn.disabled = false;
-        sendBtn.innerHTML = originalText;
-      });
-    }
   };
   
-  document.addEventListener('DOMContentLoaded', () => app.init());
+  // Initialize app when DOM is loaded
+  document.addEventListener('DOMContentLoaded', () => {
+    app.init();
+  });

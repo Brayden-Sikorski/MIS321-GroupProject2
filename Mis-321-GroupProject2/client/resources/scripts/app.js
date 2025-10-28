@@ -1,9 +1,17 @@
 // Simple Router and App State
 const app = {
   currentPage: 'home',
+  navCollapse: null,
+  
   init() {
     this.setupNavigation();
     this.renderPage('home');
+    
+    // Initialize collapse instance once (reuse across calls)
+    const navElement = document.getElementById('navbarNav');
+    if (navElement) {
+      this.navCollapse = bootstrap.Collapse.getOrCreateInstance(navElement);
+    }
   },
 
   setupNavigation() {
@@ -19,6 +27,11 @@ const app = {
         document.querySelectorAll('.nav-link').forEach(nav => nav.classList.remove('active'));
         if (target.classList.contains('nav-link')) {
           target.classList.add('active');
+        }
+        
+        // Close navbar menu on mobile after selection (reuse instance)
+        if (this.navCollapse && this.navCollapse._element.classList.contains('show')) {
+          this.navCollapse.hide();
         }
       }
     });
@@ -196,10 +209,10 @@ const app = {
                   Calculate your carbon footprint and explore how renewable energy can benefit your household
                 </p>
                 <div class="d-flex justify-content-center gap-3 flex-wrap">
-                  <button class="btn btn-light btn-lg" data-page="calculator">
+                  <button class="btn btn-action-calc btn-lg" data-page="calculator">
                     <i class="bi bi-calculator"></i> Calculate Your Emissions
                   </button>
-                  <button class="btn btn-outline-light btn-lg" data-page="breakeven">
+                  <button class="btn btn-action-analyze btn-lg" data-page="breakeven">
                     <i class="bi bi-graph-up"></i> Analyze Your Savings
                   </button>
                 </div>
@@ -368,18 +381,19 @@ const app = {
   },
 
   calculateCarbon() {
-    // Get input values
-    const electricity = parseFloat(document.getElementById('electricity').value) || 0;
-    const naturalGas = parseFloat(document.getElementById('naturalGas').value) || 0;
-    const miles = parseFloat(document.getElementById('miles').value) || 0;
-    const mpg = parseFloat(document.getElementById('mpg').value) || 25;
-    const flights = parseFloat(document.getElementById('flights').value) || 0;
+    // Get input values with validation
+    const electricity = Math.max(0, parseFloat(document.getElementById('electricity').value) || 0);
+    const naturalGas = Math.max(0, parseFloat(document.getElementById('naturalGas').value) || 0);
+    const miles = Math.max(0, parseFloat(document.getElementById('miles').value) || 0);
+    const mpgRaw = parseFloat(document.getElementById('mpg').value) || 25;
+    const mpg = Math.max(1, mpgRaw); // Ensure MPG is at least 1 to prevent division by zero
+    const flights = Math.max(0, parseFloat(document.getElementById('flights').value) || 0);
 
-    // Emission factors (approximate)
-    const electricityFactor = 0.92; // lbs CO2 per kWh (US average)
-    const gasFactor = 11.7; // lbs CO2 per therm
-    const gasolineFactor = 19.6; // lbs CO2 per gallon
-    const flightFactor = 1100; // lbs CO2 per round-trip short-haul flight
+    // Emission factors (approximate) - Based on US EPA and EIA data
+    const electricityFactor = 0.92; // lbs CO2 per kWh (US grid average, 2023)
+    const gasFactor = 11.7; // lbs CO2 per therm (natural gas combustion)
+    const gasolineFactor = 19.6; // lbs CO2 per gallon (gasoline combustion)
+    const flightFactor = 1100; // lbs CO2 per round-trip short-haul flight (< 3 hours each way)
 
     // Calculate emissions (in pounds, then convert to tons)
     const electricityEmissions = (electricity * 12 * electricityFactor) / 2000;
@@ -390,18 +404,19 @@ const app = {
     const totalEmissions = electricityEmissions + gasEmissions + vehicleEmissions + flightEmissions;
 
     // Update UI
-    document.getElementById('electricityEmissions').textContent = electricityEmissions.toFixed(1);
-    document.getElementById('gasEmissions').textContent = gasEmissions.toFixed(1);
-    document.getElementById('vehicleEmissions').textContent = vehicleEmissions.toFixed(1);
-    document.getElementById('flightEmissions').textContent = flightEmissions.toFixed(1);
-    document.getElementById('totalEmissions').textContent = totalEmissions.toFixed(1);
+    document.getElementById('electricityEmissions').textContent = electricityEmissions.toFixed(2);
+    document.getElementById('gasEmissions').textContent = gasEmissions.toFixed(2);
+    document.getElementById('vehicleEmissions').textContent = vehicleEmissions.toFixed(2);
+    document.getElementById('flightEmissions').textContent = flightEmissions.toFixed(2);
+    document.getElementById('totalEmissions').textContent = totalEmissions.toFixed(2);
 
     // Comparison
     const avgHousehold = 48;
-    const percentDiff = ((totalEmissions - avgHousehold) / avgHousehold * 100).toFixed(0);
+    const percentDiff = ((totalEmissions - avgHousehold) / avgHousehold) * 100;
+    const absPercent = Math.round(Math.abs(percentDiff));
     const comparisonText = totalEmissions > avgHousehold 
-      ? `You emit ${Math.abs(percentDiff)}% more than average`
-      : `You emit ${Math.abs(percentDiff)}% less than average`;
+      ? `You emit ${absPercent}% more than average`
+      : `You emit ${absPercent}% less than average`;
     
     document.getElementById('comparison').innerHTML = `<strong>${comparisonText}</strong>`;
 
@@ -432,15 +447,6 @@ const app = {
                       <h5 class="mb-3 text-success">
                         <i class="bi bi-receipt"></i> Current Energy Costs
                       </h5>
-
-                      <div class="mb-3">
-                        <label class="form-label">Monthly Electric Bill</label>
-                        <div class="input-group">
-                          <span class="input-group-text">$</span>
-                          <input type="number" class="form-control" id="monthlyBill" placeholder="150" min="0" value="150">
-                          <span class="input-group-text">/month</span>
-                        </div>
-                      </div>
 
                       <div class="mb-3">
                         <label class="form-label">Cost per kWh</label>
@@ -541,27 +547,29 @@ const app = {
                   <!-- Key Metrics -->
                   <div class="row g-3 mb-4">
                     <div class="col-md-4">
-                      <div class="card bg-success text-white text-center">
-                        <div class="card-body">
-                          <h6 class="text-uppercase">Breakeven Time</h6>
-                          <h2 class="display-6 fw-bold"><span id="breakevenYears">0</span> years</h2>
+                      <div class="card bg-success text-white text-center h-100">
+                        <div class="card-body d-flex flex-column justify-content-center" style="min-height: 120px;">
+                          <h6 class="text-uppercase mb-2">Breakeven Time</h6>
+                          <h2 class="display-6 fw-bold mb-0"><span id="breakevenYears">0</span> years</h2>
+                          <p class="mb-0" style="visibility: hidden;">spacer</p>
                         </div>
                       </div>
                     </div>
                     <div class="col-md-4">
-                      <div class="card bg-warning text-center">
-                        <div class="card-body">
-                          <h6 class="text-uppercase">Total System Cost</h6>
-                          <h2 class="display-6 fw-bold">$<span id="totalCost">0</span></h2>
-                          <small>After incentives</small>
+                      <div class="card bg-warning text-center h-100">
+                        <div class="card-body d-flex flex-column justify-content-center" style="min-height: 120px;">
+                          <h6 class="text-uppercase mb-2">Total System Cost</h6>
+                          <h2 class="display-6 fw-bold mb-0">$<span id="totalCost">0</span></h2>
+                          <small class="text-muted">After incentives</small>
                         </div>
                       </div>
                     </div>
                     <div class="col-md-4">
-                      <div class="card bg-info text-white text-center">
-                        <div class="card-body">
-                          <h6 class="text-uppercase">25-Year Savings</h6>
-                          <h2 class="display-6 fw-bold">$<span id="totalSavings">0</span></h2>
+                      <div class="card bg-info text-white text-center h-100">
+                        <div class="card-body d-flex flex-column justify-content-center" style="min-height: 120px;">
+                          <h6 class="text-uppercase mb-2">25-Year Savings</h6>
+                          <h2 class="display-6 fw-bold mb-0">$<span id="totalSavings">0</span></h2>
+                          <p class="mb-0" style="visibility: hidden;">spacer</p>
                         </div>
                       </div>
                     </div>
@@ -601,7 +609,7 @@ const app = {
                         <tbody>
                           <tr>
                             <td>Annual Energy Production</td>
-                            <td class="text-end fw-bold"><span id="annualProduction">0</span> kWh</td>
+                            <td class="text-end fw-bold"><span id="annualProduction">0</span> kWh/year</td>
                           </tr>
                           <tr>
                             <td>% of Usage Covered</td>
@@ -613,7 +621,7 @@ const app = {
                           </tr>
                           <tr>
                             <td>Annual Maintenance Cost</td>
-                            <td class="text-end">$<span id="maintenance">100</span></td>
+                            <td class="text-end">$<span id="maintenance">100</span>/year</td>
                           </tr>
                         </tbody>
                       </table>
@@ -624,9 +632,9 @@ const app = {
                   <div class="alert alert-info mt-4">
                     <h6 class="fw-bold"><i class="bi bi-calendar-check"></i> Investment Timeline:</h6>
                     <ul class="mb-0">
-                      <li><strong>Year <span id="breakevenYear">0</span>:</strong> You'll break even on your investment</li>
-                      <li><strong>Year 10:</strong> Estimated total savings of $<span id="savings10">0</span></li>
-                      <li><strong>Year 25:</strong> Estimated total savings of $<span id="savings25">0</span></li>
+                      <li class="mb-2"><strong>Break Even:</strong> Year <span id="breakevenYear">0</span> — You'll have recovered your initial investment</li>
+                      <li class="mb-2"><strong>10 Years:</strong> Estimated cumulative savings of $<span id="savings10">0</span></li>
+                      <li><strong>25 Years:</strong> Estimated cumulative savings of $<span id="savings25">0</span></li>
                     </ul>
                   </div>
 
@@ -657,16 +665,15 @@ const app = {
   },
 
   calculateBreakeven() {
-    // Get input values
-    const monthlyBill = parseFloat(document.getElementById('monthlyBill').value) || 150;
-    const costPerKwh = parseFloat(document.getElementById('costPerKwh').value) || 0.14;
-    const annualUsage = parseFloat(document.getElementById('annualUsage').value) || 10800;
-    const rateIncrease = parseFloat(document.getElementById('rateIncrease').value) || 3;
-    const systemSize = parseFloat(document.getElementById('systemSize').value) || 8;
-    const costPerWatt = parseFloat(document.getElementById('costPerWatt').value) || 2.75;
-    const taxCredit = parseFloat(document.getElementById('taxCredit').value) || 30;
-    const stateIncentives = parseFloat(document.getElementById('stateIncentives').value) || 0;
-    const efficiency = parseFloat(document.getElementById('efficiency').value) || 85;
+    // Get input values with validation (ensure no negative values)
+    const costPerKwh = Math.max(0, parseFloat(document.getElementById('costPerKwh').value) || 0.14);
+    const annualUsage = Math.max(0, parseFloat(document.getElementById('annualUsage').value) || 10800);
+    const rateIncrease = Math.max(0, parseFloat(document.getElementById('rateIncrease').value) || 3);
+    const systemSize = Math.max(0, parseFloat(document.getElementById('systemSize').value) || 8);
+    const costPerWatt = Math.max(0, parseFloat(document.getElementById('costPerWatt').value) || 2.75);
+    const taxCredit = Math.max(0, parseFloat(document.getElementById('taxCredit').value) || 30);
+    const stateIncentives = Math.max(0, parseFloat(document.getElementById('stateIncentives').value) || 0);
+    const efficiency = Math.max(0, Math.min(100, parseFloat(document.getElementById('efficiency').value) || 85)); // Clamp between 0-100%
 
     // Calculate system costs
     const systemCostBefore = systemSize * 1000 * costPerWatt;
@@ -674,56 +681,74 @@ const app = {
     const netSystemCost = systemCostBefore - taxCreditAmount - stateIncentives;
 
     // Calculate annual production (kWh)
-    // Average: 1 kW produces about 1,300-1,600 kWh per year depending on location
-    const avgProductionPerKW = 1400;
+    // Typical US production: 1 kW system produces ~1,400 kWh/year (varies by location)
+    // Range: 1,200-1,800 kWh per kW depending on geographic location and sun hours
+    const avgProductionPerKW = 1400; // kWh per kW per year (US average)
     const annualProduction = systemSize * avgProductionPerKW * (efficiency / 100);
     const percentCovered = Math.min((annualProduction / annualUsage * 100), 100);
 
     // Calculate savings
     const firstYearSavings = annualProduction * costPerKwh;
-    const maintenanceCost = 100; // Annual maintenance estimate
+    const maintenanceCost = Math.max(0, systemSize * 12); // Annual maintenance: ~$12 per kW
 
     // Calculate breakeven with increasing utility rates
     let cumulativeSavings = 0;
     let breakevenYears = 0;
     let savings10 = 0;
     let savings25 = 0;
+    const maxYears = 30;
     
-    for (let year = 1; year <= 30; year++) {
+    for (let year = 1; year <= maxYears; year++) {
       const yearlyRate = costPerKwh * Math.pow(1 + (rateIncrease / 100), year - 1);
       const yearlySavings = (annualProduction * yearlyRate) - maintenanceCost;
       cumulativeSavings += yearlySavings;
       
+      // Calculate breakeven point
       if (cumulativeSavings >= netSystemCost && breakevenYears === 0) {
-        breakevenYears = year + (netSystemCost - (cumulativeSavings - yearlySavings)) / yearlySavings;
+        const prevCumulative = cumulativeSavings - yearlySavings;
+        const neededToBreakeven = netSystemCost - prevCumulative;
+        breakevenYears = year - 1 + (neededToBreakeven / yearlySavings);
       }
       
+      // Capture savings at specific years
       if (year === 10) savings10 = cumulativeSavings;
       if (year === 25) savings25 = cumulativeSavings;
+      
+      // Early exit optimization: if we've calculated breakeven and are past year 25, stop
+      if (breakevenYears > 0 && year > 25) break;
+    }
+
+    // Handle case where breakeven is never reached (set to a large number)
+    if (breakevenYears === 0) {
+      breakevenYears = 999; // Indicate system will not pay for itself
     }
 
     // Environmental calculations
+    // Based on US grid average: 0.92 lbs CO2 per kWh ÷ 2000 = tons CO2 per kWh
     const co2OffsetPerKwh = 0.92 / 2000; // tons CO2 per kWh
     const co2Offset = (annualProduction * 25 * co2OffsetPerKwh).toFixed(1);
     const treesEquivalent = Math.round(co2Offset * 16); // rough estimate: 1 ton CO2 = 16 trees
 
     // Update UI
-    document.getElementById('breakevenYears').textContent = breakevenYears.toFixed(1);
+    const breakevenText = breakevenYears >= 999 ? 'Never' : breakevenYears.toFixed(1);
+    document.getElementById('breakevenYears').textContent = breakevenText;
     document.getElementById('totalCost').textContent = netSystemCost.toLocaleString('en-US', {maximumFractionDigits: 0});
     document.getElementById('totalSavings').textContent = savings25.toLocaleString('en-US', {maximumFractionDigits: 0});
     
     document.getElementById('costBefore').textContent = systemCostBefore.toLocaleString('en-US', {maximumFractionDigits: 0});
     document.getElementById('taxCreditPercent').textContent = taxCredit;
     document.getElementById('taxCreditAmount').textContent = taxCreditAmount.toLocaleString('en-US', {maximumFractionDigits: 0});
-    document.getElementById('stateIncentivesAmount').textContent = stateIncentives.toLocaleString('en-US', {maximumFractionDigits: 0});
+    // Display state incentives (already formatted with -$ in template)
+    document.getElementById('stateIncentivesAmount').textContent = Math.round(stateIncentives).toLocaleString('en-US');
     document.getElementById('netCost').textContent = netSystemCost.toLocaleString('en-US', {maximumFractionDigits: 0});
     
     document.getElementById('annualProduction').textContent = annualProduction.toLocaleString('en-US', {maximumFractionDigits: 0});
     document.getElementById('percentCovered').textContent = percentCovered.toFixed(0);
-    document.getElementById('firstYearSavings').textContent = firstYearSavings.toLocaleString('en-US', {maximumFractionDigits: 0});
-    document.getElementById('maintenance').textContent = maintenanceCost;
+    document.getElementById('firstYearSavings').textContent = firstYearSavings.toLocaleString('en-US', {maximumFractionDigits: 2});
+    document.getElementById('maintenance').textContent = maintenanceCost.toLocaleString('en-US', {maximumFractionDigits: 2});
     
-    document.getElementById('breakevenYear').textContent = Math.ceil(breakevenYears);
+    const breakevenYearText = breakevenYears >= 999 ? '30+' : Math.ceil(breakevenYears).toString();
+    document.getElementById('breakevenYear').textContent = breakevenYearText;
     document.getElementById('savings10').textContent = savings10.toLocaleString('en-US', {maximumFractionDigits: 0});
     document.getElementById('savings25').textContent = savings25.toLocaleString('en-US', {maximumFractionDigits: 0});
     
@@ -733,7 +758,7 @@ const app = {
     // Show results
     document.getElementById('breakevenResults').style.display = 'block';
     document.getElementById('breakevenResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+  },
 };
 
 // Initialize app when DOM is loaded

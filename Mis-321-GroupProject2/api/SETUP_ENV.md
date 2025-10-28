@@ -9,8 +9,10 @@ In the `api` folder, create a file named `.env` (not .env.example)
 Open `.env` and add:
 
 ```
-OPENAI_API_KEY=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
+OPENAI_API_KEY=your_openai_api_key_here
 ```
+
+Replace `your_openai_api_key_here` with your actual key from https://platform.openai.com/api-keys
 
 ## Step 3: Restart Server
 

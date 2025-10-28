@@ -12,6 +12,10 @@ if (!process.env.OPENAI_API_KEY) {
 
 router.post('/message', async (req, res) => {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OpenAI API key not configured. Please set OPENAI_API_KEY in .env file' });
+    }
+
     const { message } = req.body;
 
     if (!message) {
@@ -39,7 +43,13 @@ router.post('/message', async (req, res) => {
     res.json({ response });
   } catch (error) {
     console.error('Chat error:', error);
-    res.status(500).json({ error: 'Failed to get response from AI' });
+    let errorMessage = 'Failed to get response from AI';
+    if (error.status === 401) {
+      errorMessage = 'Invalid API key. Please check your OpenAI API key in the .env file';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    res.status(500).json({ error: errorMessage });
   }
 });
 

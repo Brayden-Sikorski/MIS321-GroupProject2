@@ -3,8 +3,12 @@ const router = express.Router();
 const OpenAI = require('openai');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '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'
+  apiKey: process.env.OPENAI_API_KEY
 });
+
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('⚠️  WARNING: OPENAI_API_KEY not set. Chat feature will not work.');
+}
 
 router.post('/message', async (req, res) => {
   try {

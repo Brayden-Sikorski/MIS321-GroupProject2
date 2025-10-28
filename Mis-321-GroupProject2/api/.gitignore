@@ -4,4 +4,7 @@ data/
 *.db-shm
 *.db-wal
 .env
+.env.local
+.env.*.local
+*.log
 

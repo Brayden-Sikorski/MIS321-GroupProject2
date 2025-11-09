@@ -1,50 +1,66 @@
-# Crimson Energy Initiative - Backend API
+# Crimson Energy Initiative – .NET Backend
 
-Backend API server for the environmental education site with user authentication and data persistence.
+ASP.NET Core Web API that powers authentication, user persistence, renewable-energy calculators, and the OpenAI-backed chat assistant for the Crimson Energy site.
 
-## Setup
+## Prerequisites
 
-1. Install dependencies:
+- .NET SDK 9.0+
+- SQLite (bundled with .NET; no separate install required)
+
+## Getting Started
+
 ```bash
-cd api
-npm install
+cd api/CrimsonEnergy.Api
+dotnet restore
+dotnet run
 ```
 
-2. Start the server:
-```bash
-npm start
-```
+The API listens on the standard ASP.NET Core development port (check console output, usually `http://localhost:5000`). OpenAPI docs are available at `/openapi/v1.json` when `ASPNETCORE_ENVIRONMENT=Development`.
 
-For development with auto-reload:
-```bash
-npm run dev
-```
+## Configuration
 
-The server will run on `http://localhost:3000` by default.
+The server reads settings from `appsettings*.json`, environment variables, and optional `.env` files located in either `api/.env` or `api/CrimsonEnergy.Api/.env`. Key settings:
+
+- `JWT_SECRET` (or `JwtSettings:Secret`): HMAC secret for signing tokens.
+- `OPENAI_API_KEY` (or `OpenAI:ApiKey`): Required for `/api/chat/message`.
+- `Database:Path`: Custom path for the SQLite DB (defaults to `api/data/energy.db`).
+- `ASPNETCORE_URLS`: Override the listening URL if you need a specific port.
+
+Example `.env`:
+
+```bash
+JWT_SECRET=super-secret
+OPENAI_API_KEY=sk-...
+```
 
 ## Database
 
-- Uses SQLite database stored in `api/data/energy.db`
-- Database is automatically created on first run
+- SQLite file stored at `api/data/energy.db` (auto-created on startup).
 - Tables:
-  - `users`: User accounts (email, hashed password)
-  - `calculations`: Saved user calculations (carbon emissions, breakeven analysis)
+  - `users` – email + bcrypt password hash + timestamps
+  - `calculations` – per-user carbon and breakeven results with JSON detail blobs
 
-## API Endpoints
+## API Surface
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/verify` - Verify JWT token
+`POST /api/auth/register`  
+Create an account. Body: `{ "email": "...", "password": "..." }`
 
-### User Data
-- `POST /api/user/save-calculation` - Save calculation (requires auth)
-- `GET /api/user/profile` - Get user profile with latest calculation (requires auth)
-- `GET /api/user/calculations` - Get all user calculations (requires auth)
+`POST /api/auth/login`  
+Authenticate and receive JWT + user payload.
 
-## Environment Variables
+`GET /api/auth/verify` *(auth required)*  
+Validate token; returns decoded token metadata.
 
-Optional environment variables:
-- `PORT`: Server port (default: 3000)
-- `JWT_SECRET`: Secret key for JWT tokens (default: development key)
+`POST /api/user/save-calculation` *(auth required)*  
+Persist latest calculator results for the user.
 
+`GET /api/user/profile` *(auth required)*  
+Load profile info plus most recent carbon + breakeven runs.
+
+`POST /api/chat/message`  
+Proxy to OpenAI Chat Completions with the same prompt as the previous Node service.
+
+`GET /api/health`  
+Lightweight health check for monitoring.
+
+All responses mirror the previous Node.js backend so the existing front-end continues working without changes.

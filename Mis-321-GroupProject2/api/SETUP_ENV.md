@@ -14,12 +14,26 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 Replace `your_openai_api_key_here` with your actual key from https://platform.openai.com/api-keys
 
-## Step 3: Restart Server
+## Step 3: Add JWT secret (optional but recommended)
 
-The `.env` file is automatically ignored by git, so your key stays private!
+```
+JWT_SECRET=choose_a_long_random_string
+```
 
-## Important Notes:
-- Never commit `.env` to git (it's in .gitignore)
-- The `.env.example` file shows what variables are needed
-- Restart your server after creating .env
+If omitted, the development default inside `appsettings.Development.json` is used.
+
+## Step 4: Run the API
+
+From `api/CrimsonEnergy.Api`:
+
+```
+dotnet run
+```
+
+The `.env` file is ignored by git so your keys stay local, and it will be loaded automatically on startup.
+
+## Important Notes
+- Keep `.env` out of version control (already handled via `.gitignore`).
+- Update or recreate `.env` whenever you rotate keys.
+- Restart the API after editing `.env` so .NET picks up the latest values.
 
